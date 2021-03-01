@@ -1,0 +1,222 @@
+//global variables
+int dataSetting = 1;    //1 for manual, 2 for automatic
+long collectTime = 0;   //variable for time when auto collection happens
+int collectDelay = 500; //variable for delay, in milliseconds
+bool collect = false;   //boolean for collection of data
+int dataCounter = 0;    //counter for data
+
+//Both arrays set to -1 for display function
+//array of longs for the millisecond timing
+long timeData[] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+//array of ints for voltage input
+float voltData[] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+void setup()
+{
+  //start serial monitor
+  Serial.begin(9600);
+
+  //make the button interrupt
+  attachInterrupt(0, recordDataPush, FALLING);
+
+  //activate necessary pins
+  pinMode(A1, INPUT);
+}//end setup()
+
+void loop()
+{
+  while (Serial.available())
+  {
+    char input = Serial.read();
+
+    switch (input)
+    {
+      case 'e':
+        {
+          collect = true;
+          Serial.println("Data collection enabled.\n");
+          break;
+        }
+
+      case 'd':
+        {
+          collect = false;
+          Serial.println("Data collection disabled.\n");
+          break;
+        }
+
+      case 'a':
+        {
+          dataSetting = 2;
+          Serial.print("Data set to automatic collection.\n"
+                       "Time between collection (in ms): ");
+          Serial.println(collectDelay);
+          Serial.println();
+          break;
+        }
+
+      case 'm':
+        {
+          dataSetting = 1;
+          Serial.println("Data set to manual collection.\n"
+                         "Press button to collect new data point.\n");
+          break;
+        }
+
+      case 'v':
+        displayData();
+        break;
+
+      case 's':
+        displayStats();
+        break;
+
+      case 'r':
+        wipeData();
+        break;
+
+      default:
+        Serial.println("Unknown command.\n");
+
+    }//end switch(input)
+  }//end while(serial)
+
+  recordDataAuto();
+  delay(50);  //just to keep the simulation running well
+}//end loop()
+
+void recordDataPush()
+{
+  if (collect)
+  {
+    if (dataSetting == 1)
+    {
+      writeData();
+      dataCounter++;
+    }//end else if
+  }//end if(collect)
+}//end recordData()
+
+void recordDataAuto()
+{
+  if (collect)
+  {
+    if (dataSetting == 2)
+    {
+      if (collectTime == 0)
+      {
+        collectTime = millis();
+        writeData();
+        dataCounter++;
+      }//end if(press)
+      else if (millis() > collectTime + collectDelay)
+      {
+        writeData();
+        collectTime = millis();
+        dataCounter++;
+      }//end else if(millis())
+    }//end if(dataSetting == 2)
+  }//end if(collect)
+}//end recordDataPush
+
+void writeData()
+{
+  int index = dataCounter % 10;
+  timeData[index] = millis();
+  voltData[index] = analogRead(A1) * (5.0 / 1023.0); //end writeData()
+}//end writeData()
+
+void displayData()
+{
+  if ((timeData[0] == -1) && (voltData[0] == -1))
+  {
+    Serial.println("No data available");
+  }
+  else
+  {
+    Serial.println("Stored Data:");
+    for (int i = 0; i < 10; i++)
+    {
+      if ((timeData[i] != -1) && (voltData[i] != -1))
+      {
+        Serial.print(i);
+        Serial.print(": ");
+        Serial.print(timeData[i]);
+        Serial.print(" milliseconds - ");
+        Serial.print(voltData[i]);
+        Serial.println("V");
+      }//end if()
+    }//end for()
+  }//end else
+
+  Serial.println();
+}//end displayData()
+
+void displayStats()
+{
+  if ((timeData[0] == -1) && (voltData[0] == -1))
+  {
+    Serial.println("No data available.");
+  }
+  else
+  {
+    long timeMin = millis(), timeMax = 0, timeSum = 0;
+    float voltMin = millis(), voltMax = 0, voltSum = 0;
+    float timeMed, voltMed;
+    //find min
+    for (int i = 0; i < 10; i++)
+    {
+      //time values
+      if (timeData[i] < timeMin) {
+        timeMin = timeData[i];
+      }
+      if (timeData[i] > timeMax) {
+        timeMax = timeData[i];
+      }
+      timeSum = timeSum + timeData[i];
+
+      //volt values
+      if (voltData[i] < voltMin) {
+        voltMin = voltData[i];
+      }
+      if (voltData[i] > voltMax) {
+        voltMax = voltData[i];
+      }
+      voltSum = voltSum + voltData[i];
+    }//end for()
+
+    //get the medians as decimals
+    timeMed = timeSum / 10.00;
+    voltMed = voltSum / 10.00;
+
+    //display everything
+    //time
+    Serial.print("Time Data - Min: ");
+    Serial.print(timeMin);
+    Serial.print("ms Max: ");
+    Serial.print(timeMax);
+    Serial.print("ms Median: ");
+    Serial.print(timeMed);
+    Serial.println("ms");
+
+    //volt
+    Serial.print("Volt Data - Min: ");
+    Serial.print(voltMin);
+    Serial.print("V Max: ");
+    Serial.print(voltMax);
+    Serial.print("V Median: ");
+    Serial.print(voltMed);
+    Serial.println("V");
+  }//end else()
+
+  Serial.println();
+}//end displayStats()
+
+void wipeData()
+{
+  for (int i = 0; i < 10; i++)
+  {
+    timeData[i] = -1;
+    voltData[i] = -1;
+  }
+  Serial.println("Data wiped.\n");
+}//end wipeData
